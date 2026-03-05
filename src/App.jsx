@@ -211,7 +211,7 @@ function App() {
     <div className="app-shell">
       <header className="header card">
         <div className="logo">
-          <img src="https://intranet.icmab.es/previssio/public/assets/icmab_so_blanco.png" alt="ICMAB" />
+          <img src="icmab_so_blanco.png" alt="ICMAB" />
         </div>
         <div>
           <h1>ICMAB Sustainability Commission</h1>
