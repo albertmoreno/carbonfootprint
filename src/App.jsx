@@ -1,10 +1,11 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { calcEmissions, haversineKm } from './lib/calc';
 import { DEFAULT_FACTORS, MODE_LABELS } from './data/factors';
 
 const MODES = ['car', 'bus', 'rail', 'flight', 'bike', 'walk'];
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const NOMINATIM_TIMEOUT_MS = 8000;
 
 function App() {
   const [origin, setOrigin] = useState('Barcelona, Spain');
@@ -35,11 +36,37 @@ function App() {
   const geocodeCache = useRef(new Map());
   const routeCache = useRef(new Map());
   const lastNominatimTs = useRef(0);
+  const originSearchTimeout = useRef(null);
+  const destinationSearchTimeout = useRef(null);
+  const originSearchRequestId = useRef(0);
+  const destinationSearchRequestId = useRef(0);
 
   const selectedModes = useMemo(
     () => MODES.filter((mode) => activeModes[mode]),
     [activeModes]
   );
+
+  useEffect(
+    () => () => {
+      if (originSearchTimeout.current) clearTimeout(originSearchTimeout.current);
+      if (destinationSearchTimeout.current) clearTimeout(destinationSearchTimeout.current);
+    },
+    []
+  );
+
+  const fetchWithTimeout = async (url, options = {}, timeoutMs = NOMINATIM_TIMEOUT_MS) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      return await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
 
   const searchPlaces = async (query) => {
     const trimmed = query.trim();
@@ -51,7 +78,7 @@ function App() {
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(
       trimmed
     )}`;
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       headers: {
         Accept: 'application/json'
       }
@@ -74,7 +101,7 @@ function App() {
     if (elapsed < 350) await sleep(350 - elapsed);
 
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       headers: {
         Accept: 'application/json'
       }
@@ -127,16 +154,56 @@ function App() {
 
   const handleOriginChange = (value) => {
     setOrigin(value);
-    searchPlaces(value)
-      .then((list) => setOriginSuggestions(list))
-      .catch(() => setOriginSuggestions([]));
+
+    if (value.trim().length < 3) {
+      if (originSearchTimeout.current) clearTimeout(originSearchTimeout.current);
+      setOriginSuggestions([]);
+      return;
+    }
+
+    if (originSearchTimeout.current) clearTimeout(originSearchTimeout.current);
+
+    const requestId = ++originSearchRequestId.current;
+    originSearchTimeout.current = setTimeout(() => {
+      searchPlaces(value)
+        .then((list) => {
+          if (requestId === originSearchRequestId.current) {
+            setOriginSuggestions(list);
+          }
+        })
+        .catch(() => {
+          if (requestId === originSearchRequestId.current) {
+            setOriginSuggestions([]);
+          }
+        });
+    }, 400);
   };
 
   const handleDestinationChange = (value) => {
     setDestination(value);
-    searchPlaces(value)
-      .then((list) => setDestinationSuggestions(list))
-      .catch(() => setDestinationSuggestions([]));
+
+    if (value.trim().length < 3) {
+      if (destinationSearchTimeout.current) clearTimeout(destinationSearchTimeout.current);
+      setDestinationSuggestions([]);
+      return;
+    }
+
+    if (destinationSearchTimeout.current) clearTimeout(destinationSearchTimeout.current);
+
+    const requestId = ++destinationSearchRequestId.current;
+    destinationSearchTimeout.current = setTimeout(() => {
+      searchPlaces(value)
+        .then((list) => {
+          if (requestId === destinationSearchRequestId.current) {
+            setDestinationSuggestions(list);
+          }
+        })
+        .catch(() => {
+          if (requestId === destinationSearchRequestId.current) {
+            setDestinationSuggestions([]);
+          }
+        });
+    }, 400);
   };
 
   const handleFactorsSave = () => {

@@ -277,3 +277,48 @@ textarea {
     gap: 0.7rem;
     margin-top: 0.8rem;
 }
+
+@media (max-width: 768px) {
+    .app-shell {
+        margin: 1rem auto;
+    }
+
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .header > div {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .header h1 {
+        font-size: 1.25rem;
+        line-height: 1.3;
+        font-weight: 600;
+        overflow-wrap: anywhere;
+    }
+
+    .header p {
+        overflow-wrap: anywhere;
+    }
+
+    .logo {
+        width: 100%;
+        max-width: 300px;
+    }
+
+    h2,
+    h3 {
+        font-weight: 600;
+    }
+
+    label {
+        font-weight: 500;
+    }
+
+    .big {
+        font-weight: 600;
+    }
+}
